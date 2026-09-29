@@ -1,81 +1,119 @@
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 public class ArbolBusqueda {
     private Nodo raiz;
-    private String estadoInicial;
     private String estadoObjetivo;
 
     public ArbolBusqueda(String estadoInicial, String estadoObjetivo) {
-        this.estadoInicial = estadoInicial;
         this.estadoObjetivo = estadoObjetivo;
         this.raiz = new Nodo(estadoInicial, null);
     }
 
     public void busquedaEnAnchura() {
+        ejecutarBusqueda(new LinkedList<>(), "Anchura");
+    }
+
+    public void busquedaEnProfundidad() {
+        ejecutarBusqueda(Collections.asLifoQueue(new ArrayDeque<>()), "Profundidad");
+    }
+
+    public void busquedaCostoUniforme() {
+        ejecutarBusqueda(new PriorityQueue<>(Comparator.comparingInt(Nodo::getProfundidad)), "Costo Uniforme");
+    }
+
+    // Inicio de busqueda
+    private void ejecutarBusqueda(Queue<Nodo> estructura, String nombreAlgoritmo) {
         long tiempoInicio = System.nanoTime();
-        Runtime runtime = Runtime.getRuntime();
-        long memoriaInicio = runtime.totalMemory() - runtime.freeMemory();
-
-        //Crea un conjunto para almacenar los nodos visitados y evitar ciclos
+        //almacena los estados ya visitados para evitar repetirlos
         Set<String> visitados = new HashSet<>();
-        //Busca el nodo raiz y agregarlo a la cola
-        Queue<Nodo> cola = new LinkedList<>();
-        cola.add(raiz);
-        visitados.add(raiz.getEstado());
-        Nodo nodoActual;
-        //Mientras que la cola no este vacia, hacer lo siguiente:
-        while (!cola.isEmpty()) {
-            nodoActual = cola.poll();
 
-            //Sacar el primer nodo de la cola y verificar si es el nodo objetivo
+        estructura.add(raiz);
+        visitados.add(raiz.getEstado());
+
+        while (!estructura.isEmpty()) {
+            //visita el sig nodo
+            Nodo nodoActual = estructura.poll(); 
+
+            //ya estamos en el orden correcto?
             if (nodoActual.getEstado().equals(estadoObjetivo)) {
-                System.out.println("¡Estado objetivo encontrado!\n");
+                System.out.println("¡Solución encontrada con " + nombreAlgoritmo + "!\n");
                 imprimirCamino(nodoActual);
-                imprimirMetricas(nodoActual, tiempoInicio, memoriaInicio);
+                imprimirMetricas(nodoActual, tiempoInicio, visitados.size());
                 return;
             }
 
-            // Si no es el nodo objetivo, expandir el nodo y agregar sus hijos a la cola
-            List<Nodo> hijos = HerramientasNodo.generarHijos(nodoActual);
-            for (Nodo hijo : hijos) {
-                // MEJORA: Marcar como visitado e insertar a la cola AL MISMO TIEMPO.
-                // Esto evita meter duplicados repetidos a la cola antes de que sean procesados.
+            // Expandir hijos
+            for (Nodo hijo : HerramientasNodo.generarHijos(nodoActual)) {
                 if (!visitados.contains(hijo.getEstado())) {
                     visitados.add(hijo.getEstado());
-                    cola.add(hijo);
+                    estructura.add(hijo);
                 }
             }
         }
 
-        // Si la cola se vacia sin encontrar solucion
-        System.out.println("No se encontro solucion.");
-        imprimirMetricas(null, tiempoInicio, memoriaInicio);
+        System.out.println("No se encontró solución con " + nombreAlgoritmo + ".");
+        imprimirMetricas(null, tiempoInicio, visitados.size());
     }
 
-    private void imprimirMetricas(Nodo nodoMeta, long tiempoInicio, long memoriaInicio) {
-        Runtime runtime = Runtime.getRuntime();
-        long memoriaFinal = runtime.totalMemory() - runtime.freeMemory();
-        long memoriaUsada = Math.max(0, memoriaFinal - memoriaInicio);
-        long tiempoTranscurrido = (System.nanoTime() - tiempoInicio) / 1_000_000;
+    public void busquedaIterativa(int limiteMaximo) {
+        long tiempoInicio = System.nanoTime();
+        Set<String> visitadosGlobales = new HashSet<>();
 
+        //desde el 0 hasta el limite
+        for (int limiteActual = 0; limiteActual <= limiteMaximo; limiteActual++) {
+            
+            Nodo resultado = busquedaLimitada(raiz, limiteActual, visitadosGlobales);
+
+            // Si encontró la meta en el nivel actual se finaliza
+            if (resultado != null) {
+                System.out.println("¡Solución encontrada con Profundidad Iterativa (Límite: " + limiteActual + ")!\n");
+                imprimirCamino(resultado);
+                imprimirMetricas(resultado, tiempoInicio, visitadosGlobales.size());
+                return;
+            }
+        }
+
+        System.out.println("No se encontró solución hasta el límite de " + limiteMaximo);
+        imprimirMetricas(null, tiempoInicio, visitadosGlobales.size());
+    }
+
+    // Método auxiliar recursivo para la Profundidad
+    private Nodo busquedaLimitada(Nodo nodoActual, int limite, Set<String> visitadosGlobales) {
+        visitadosGlobales.add(nodoActual.getEstado());
+
+        //caso base
+        if (nodoActual.getEstado().equals(estadoObjetivo)) {
+            return nodoActual;
+        }
+
+        //ya no podemos ir mas profundo
+        if (limite <= 0) {
+            return null;
+        }
+
+        for (Nodo hijo : HerramientasNodo.generarHijos(nodoActual)) {
+            Nodo resultado = busquedaLimitada(hijo, limite - 1, visitadosGlobales);
+            if (resultado != null) {
+                return resultado; // Trae la solución encontrada hacia arriba
+            }
+        }
+
+        return null;
+    }
+
+    private void imprimirMetricas(Nodo nodoMeta, long tiempoInicio, int nodosVisitados) {
+        long tiempoTranscurrido = (System.nanoTime() - tiempoInicio) / 1_000_000;
         int pasos = (nodoMeta != null) ? nodoMeta.getProfundidad() : 0;
 
         System.out.println("--------------------------------");
         System.out.println("Pasos necesarios: " + pasos);
-        System.out.println("Tiempo de ejecucion: " + tiempoTranscurrido + " ms");
-        System.out.println("Memoria estimada utilizada: " + memoriaUsada + " bytes");
+        System.out.println("Nodos visitados: " + nodosVisitados);
+        System.out.println("Tiempo de ejecución: " + tiempoTranscurrido + " ms");
         System.out.println("--------------------------------");
     }
 
-    // Imprime de forma recursiva los tableros desde la raiz hasta el objetivo
     private void imprimirCamino(Nodo nodo) {
-        if (nodo == null) {
-            return;
-        }
+        if (nodo == null) return;
         imprimirCamino(nodo.getPadre());
         System.out.println(HerramientasNodo.formatearEstado(nodo.getEstado()));
     }

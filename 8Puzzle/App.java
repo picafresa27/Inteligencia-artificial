@@ -5,7 +5,7 @@ public class App {
         String estadoObjetivo = "12345678 "; 
 
         ArbolBusqueda arbol = new ArbolBusqueda(estadoInicial, estadoObjetivo);
-        arbol.busquedaEnAnchura();
+        arbol.busquedaCostoUniforme();
         
         System.out.println("Fin del programa");
     }
