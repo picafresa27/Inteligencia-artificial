@@ -1,0 +1,68 @@
+import tensorflow as tf
+layers = tf.keras.layers
+models = tf.keras.models
+
+#Configuración básica de las imagenes y el tamaño del lote.
+BATCH_SIZE = 32 
+IMG_HEIGHT = 100
+IMG_WIDTH = 100
+
+# Busca las carpetas del dataset una por una utilizando la funcion de tensorflow.
+train_ds = tf.keras.utils.image_dataset_from_directory(
+    'dataset',
+    validation_split=0.2, # Deja un 20% de las imagenes para utilizarlas como validación y entrena el resto.
+    subset="training", # Almacena el resto de las imagenes en el conjunto de entrenamiento.
+    seed=123, # Semilla para que la división de las imagenes sea aleatoria.
+    image_size=(IMG_HEIGHT, IMG_WIDTH),
+    color_mode='grayscale',
+    batch_size=BATCH_SIZE
+)
+
+val_ds = tf.keras.utils.image_dataset_from_directory(
+    'dataset',
+    validation_split=0.2,
+    subset="validation", # Almacena el 20% de las imagenes en el conjunto de validación.
+    seed=123,
+    image_size=(IMG_HEIGHT, IMG_WIDTH),
+    color_mode='grayscale',
+    batch_size=BATCH_SIZE
+)
+
+class_names = train_ds.class_names # Extrae los nombres de las carpetas.
+print("Personas detectadas:", class_names)
+num_classes = len(class_names) # Numero de clases que se le daran a la red para que aprenda a reconocerlas.
+
+# Arquitectura de la CNN.
+model = models.Sequential([
+    # Capa de entrada que convierte los valores de los pixeles de 0-255 a 0-1.
+    layers.Rescaling(1./255, input_shape=(IMG_HEIGHT, IMG_WIDTH, 1)),
+    # Primera capa convolucional con 16 filtros de 3x3, detecta patrones simples como bordes y esquinas.
+    layers.Conv2D(16, 3, padding='same', activation='relu'),
+    # Se queda con la información más importante de la imagen reduciendo su tamaño a la mitad.
+    layers.MaxPooling2D(),
+    # Segunda capa convolucional con 32 filtros de 3x3, detecta patrones más complejos.
+    layers.Conv2D(32, 3, padding='same', activation='relu'),
+    layers.MaxPooling2D(),
+    # Tercera capa convolucional con 64 filtros de 3x3, detecta patrones aún más complejos.
+    layers.Flatten(),
+    layers.Dense(64, activation='relu'),
+    # Utiliza la función softmax para convertir los valores de salida en probabilidades para cada clase.
+    layers.Dense(num_classes, activation='softmax')
+])
+
+# Compila el modelo en base a que tan cercano está el resultado de la predicción con la realidad.
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+              metrics=['accuracy'])
+
+# Entrena el modelo
+print("Entrenando la red neuronal.")
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=10
+)
+
+# Guardar el modelo entrenado
+model.save('modelo_cnn_rostros.h5')
+print("Entrenamiento finalizado.")
